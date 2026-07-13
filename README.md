@@ -1,6 +1,6 @@
 # FCG Catalog API
 
-Microsserviço responsável pelo catálogo de jogos e biblioteca dos usuários da plataforma FCG (Facul Cloud Games).
+Microsserviço responsável pelo catálogo de jogos e biblioteca dos usuários da plataforma FCG (Fiap Cloud Games).
 
 ## Funcionalidades
 
