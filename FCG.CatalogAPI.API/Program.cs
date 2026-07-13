@@ -91,6 +91,9 @@ builder.Services.AddMassTransit(x =>
             h.Password("guest");
         });
 
+        cfg.Message<FCG.Shared.Events.OrderPlacedEvent>(m => m.SetEntityName("OrderPlacedEvent"));
+        cfg.Message<FCG.Shared.Events.PaymentProcessedEvent>(m => m.SetEntityName("PaymentProcessedEvent"));
+
         cfg.ConfigureEndpoints(context);
     });
 });

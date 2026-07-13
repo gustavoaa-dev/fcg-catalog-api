@@ -1,4 +1,4 @@
-namespace FCG.CatalogAPI.Domain.Events;
+namespace FCG.Shared.Events;
 
 public class PaymentProcessedEvent
 {

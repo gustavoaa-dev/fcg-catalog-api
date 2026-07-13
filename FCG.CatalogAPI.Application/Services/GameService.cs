@@ -1,6 +1,6 @@
 using FCG.CatalogAPI.Application.DTOs;
 using FCG.CatalogAPI.Domain.Entities;
-using FCG.CatalogAPI.Domain.Events;
+using FCG.Shared.Events;
 using FCG.CatalogAPI.Domain.Interfaces;
 using MassTransit;
 

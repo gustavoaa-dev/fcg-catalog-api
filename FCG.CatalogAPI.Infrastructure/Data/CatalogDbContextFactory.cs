@@ -8,7 +8,7 @@ public class CatalogDbContextFactory : IDesignTimeDbContextFactory<CatalogDbCont
     public CatalogDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<CatalogDbContext>();
-        optionsBuilder.UseSqlServer("Server=localhost;Database=FCG_Catalog;Trusted_Connection=True;TrustServerCertificate=True");
+        optionsBuilder.UseSqlServer("Server=127.0.0.1;Database=FCG_Catalog;User Id=sa;Password=Fcg2024Test!;Encrypt=False;TrustServerCertificate=True");
 
         return new CatalogDbContext(optionsBuilder.Options);
     }
