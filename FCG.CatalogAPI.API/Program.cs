@@ -104,6 +104,13 @@ builder.Services.AddScoped<GameService>();
 
 var app = builder.Build();
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider
+        .GetRequiredService<CatalogDbContext>();
+    db.Database.Migrate();
+}
+
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseSwagger();
 app.UseSwaggerUI(c =>
