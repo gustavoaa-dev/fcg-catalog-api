@@ -16,7 +16,11 @@ public class AvaliacoesController : ControllerBase
         _reviewService = reviewService;
     }
 
+    // As duas formas submetem a mesma avaliação com a mesma semântica de upsert por
+    // (gameId, userId) e os mesmos 201/200: a §117 da spec escreve POST, e o PUT é a escolha
+    // idempotente do D9 — aceitar os dois evita 405 em quem segue o enunciado ao pé da letra.
     [HttpPut]
+    [HttpPost]
     [Authorize]
     public async Task<ActionResult<ReviewResponseDTO>> Avaliar(Guid gameId, [FromBody] CriarAvaliacaoDTO dto)
     {

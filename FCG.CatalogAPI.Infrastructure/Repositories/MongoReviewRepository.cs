@@ -51,7 +51,31 @@ public class MongoReviewRepository : IReviewRepository
             .SetOnInsert(r => r.Id, review.Id)
             .SetOnInsert(r => r.DataCriacao, review.DataCriacao);
 
-        var resultado = await _colecao.UpdateOneAsync(filtro, atualizacao, new UpdateOptions { IsUpsert = true });
+        // Corrida de upsert: com IsUpsert sobre o índice único (gameId, userId), duas
+        // submissões simultâneas do mesmo par podem decidir inserir ao mesmo tempo e a
+        // perdedora falha com E11000. Sem tratamento, a MongoWriteException não casa com
+        // nenhum caso do ErrorHandlingMiddleware e viraria 500 com stack trace no cliente —
+        // contrato errado para quem só reenviou a avaliação.
+        UpdateResult resultado;
+        try
+        {
+            resultado = await _colecao.UpdateOneAsync(filtro, atualizacao, new UpdateOptions { IsUpsert = true });
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Code == 11000)
+        {
+            // A repetição resolve porque a chave duplicada só pode ter vindo da requisição que
+            // venceu a corrida: o documento já existe no store, então o mesmo filtro
+            // (gameId, userId) passa a casar com ele e esta chamada atualiza em vez de inserir.
+            // É uma repetição única e não um laço: depois que a vencedora inseriu, não existe
+            // mais inserção concorrente possível para este par (o índice único a barra), e por
+            // isso uma falha desta segunda chamada propaga normalmente para o middleware.
+            _logger.LogWarning(ex,
+                "Corrida de upsert na avaliacao do jogo {GameId} pelo usuario {UserId}: chave duplicada "
+                + "(E11000). Repetindo o upsert uma unica vez para atualizar o documento vencedor.",
+                review.GameId, review.UserId);
+
+            resultado = await _colecao.UpdateOneAsync(filtro, atualizacao, new UpdateOptions { IsUpsert = true });
+        }
 
         var criou = resultado.UpsertedId is not null;
         _logger.LogInformation("Avaliacao {Acao} para o jogo {GameId} pelo usuario {UserId}.",
