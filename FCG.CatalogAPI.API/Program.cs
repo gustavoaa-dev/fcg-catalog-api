@@ -103,6 +103,7 @@ builder.Services.AddMassTransit(x =>
 builder.Services.AddScoped<IGameRepository, GameRepository>();
 builder.Services.AddScoped<IUserGameRepository, UserGameRepository>();
 builder.Services.AddScoped<GameService>();
+builder.Services.AddScoped<ReviewService>();
 
 var mongoConnectionString = builder.Configuration["Mongo:ConnectionString"]
     ?? throw new InvalidOperationException("A configuração Mongo:ConnectionString não foi encontrada.");
