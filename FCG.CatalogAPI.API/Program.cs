@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Prometheus;
 using System.Security.Claims;
 using System.Text;
 
@@ -102,7 +103,13 @@ builder.Services.AddScoped<IGameRepository, GameRepository>();
 builder.Services.AddScoped<IUserGameRepository, UserGameRepository>();
 builder.Services.AddScoped<GameService>();
 
+builder.Services.AddHealthChecks();
+
 var app = builder.Build();
+
+// Metricas HTTP: registradas antes dos demais middlewares para contar tambem
+// as respostas geradas por erro/autenticacao (401, 404, 500).
+app.UseHttpMetrics();
 
 using (var scope = app.Services.CreateScope())
 {
@@ -122,6 +129,8 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapMetrics();
+app.MapHealthChecks("/health");
 
 app.Run();
 
