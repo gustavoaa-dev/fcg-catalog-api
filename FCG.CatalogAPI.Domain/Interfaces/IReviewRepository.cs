@@ -4,8 +4,12 @@ namespace FCG.CatalogAPI.Domain.Interfaces;
 
 public interface IReviewRepository
 {
-    /// <summary>Insere ou substitui a avaliação do par (jogo, usuário). Retorna true quando criou.</summary>
-    Task<bool> UpsertAsync(Review review);
+    /// <summary>
+    /// Insere ou substitui a avaliação do par (jogo, usuário). Devolve a avaliação
+    /// <b>como está persistida</b> (em uma atualização o id e a dataCriacao são os originais)
+    /// e true quando criou.
+    /// </summary>
+    Task<(Review Avaliacao, bool Criada)> UpsertAsync(Review review);
 
     Task<IEnumerable<Review>> ObterPorJogoAsync(Guid gameId);
 

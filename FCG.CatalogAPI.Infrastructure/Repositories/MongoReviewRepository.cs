@@ -36,7 +36,7 @@ public class MongoReviewRepository : IReviewRepository
         _logger.LogInformation("Indice unico (gameId, userId) garantido na colecao {Colecao}.", NomeColecao);
     }
 
-    public async Task<bool> UpsertAsync(Review review)
+    public async Task<(Review Avaliacao, bool Criada)> UpsertAsync(Review review)
     {
         var filtro = Builders<ReviewDocument>.Filter.Eq(r => r.GameId, review.GameId)
                      & Builders<ReviewDocument>.Filter.Eq(r => r.UserId, review.UserId);
@@ -57,7 +57,18 @@ public class MongoReviewRepository : IReviewRepository
         _logger.LogInformation("Avaliacao {Acao} para o jogo {GameId} pelo usuario {UserId}.",
             criou ? "criada" : "atualizada", review.GameId, review.UserId);
 
-        return criou;
+        // São duas operações de propósito. (1) FindOneAndUpdate não informa se houve
+        // inserção, e é o UpsertedId do update acima que decide o 201/200. (2) Devolver o
+        // objeto montado em memória dava contrato errado: numa atualização o documento
+        // preserva o _id e a dataCriacao originais (SetOnInsert), então o corpo do PUT
+        // responderia um id/instante que nunca existiram no store e contradiria o GET.
+        // Reler o documento persistido é o que faz PUT e GET concordarem.
+        var persistida = await _colecao.Find(filtro).FirstOrDefaultAsync();
+        if (persistida is null)
+            throw new InvalidOperationException(
+                $"A avaliacao do jogo {review.GameId} pelo usuario {review.UserId} nao foi encontrada apos o upsert.");
+
+        return (persistida.ParaEntidade(), criou);
     }
 
     public async Task<IEnumerable<Review>> ObterPorJogoAsync(Guid gameId)

@@ -45,8 +45,11 @@ public class ReviewService
             DataAtualizacao = agora
         };
 
-        var criada = await _reviewRepository.UpsertAsync(review);
-        return (Mapear(review), criada);
+        // O Id e a DataCriacao acima so valem para o SetOnInsert: em uma atualizacao o
+        // documento mantem o _id e a dataCriacao originais, entao a resposta tem que vir
+        // do documento persistido — senao o corpo do PUT contradiz o do GET.
+        var (persistida, criada) = await _reviewRepository.UpsertAsync(review);
+        return (Mapear(persistida), criada);
     }
 
     public async Task<IEnumerable<ReviewResponseDTO>> ObterPorJogoAsync(Guid gameId)
