@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using MongoDB.Driver;
 using Prometheus;
 using System.Security.Claims;
 using System.Text;
@@ -103,6 +104,16 @@ builder.Services.AddScoped<IGameRepository, GameRepository>();
 builder.Services.AddScoped<IUserGameRepository, UserGameRepository>();
 builder.Services.AddScoped<GameService>();
 
+var mongoConnectionString = builder.Configuration["Mongo:ConnectionString"]
+    ?? throw new InvalidOperationException("A configuração Mongo:ConnectionString não foi encontrada.");
+var mongoDatabaseName = builder.Configuration["Mongo:DatabaseName"] ?? "fcg_catalog";
+
+builder.Services.AddSingleton<IMongoClient>(_ =>
+    new MongoClient(mongoConnectionString));
+builder.Services.AddScoped<IMongoDatabase>(sp =>
+    sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDatabaseName));
+builder.Services.AddScoped<IReviewRepository, MongoReviewRepository>();
+
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
@@ -116,6 +127,17 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider
         .GetRequiredService<CatalogDbContext>();
     db.Database.Migrate();
+
+    try
+    {
+        var repositorioAvaliacoes = scope.ServiceProvider.GetRequiredService<IReviewRepository>();
+        await repositorioAvaliacoes.InicializarAsync();
+    }
+    catch (Exception ex)
+    {
+        // Mongo fora do ar não pode impedir o catálogo (SQL) de subir: degrada como o cache.
+        app.Logger.LogError(ex, "Nao foi possivel inicializar a colecao de avaliacoes no MongoDB.");
+    }
 }
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
