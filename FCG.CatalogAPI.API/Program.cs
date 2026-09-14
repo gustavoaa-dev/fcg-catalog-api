@@ -1,14 +1,17 @@
 using FCG.CatalogAPI.Application.Consumers;
 using FCG.CatalogAPI.Application.Services;
 using FCG.CatalogAPI.Domain.Interfaces;
+using FCG.CatalogAPI.Infrastructure.Cache;
 using FCG.CatalogAPI.Infrastructure.Data;
 using FCG.CatalogAPI.Infrastructure.Repositories;
 using FCG.CatalogAPI.API.Middlewares;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using MongoDB.Driver;
 using Prometheus;
 using System.Security.Claims;
 using System.Text;
@@ -99,9 +102,39 @@ builder.Services.AddMassTransit(x =>
     });
 });
 
-builder.Services.AddScoped<IGameRepository, GameRepository>();
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    // abortConnect=false: sem Redis a API sobe e degrada em vez de falhar no boot.
+    // Timeouts curtos: um Redis morto falha rápido, não pendura a requisição.
+    options.ConfigurationOptions = new StackExchange.Redis.ConfigurationOptions
+    {
+        EndPoints = { redisConnectionString },
+        AbortOnConnectFail = false,
+        ConnectTimeout = 2000,
+        SyncTimeout = 2000
+    };
+});
+
+builder.Services.AddScoped<GameRepository>();
+builder.Services.AddScoped<IGameRepository>(sp => new CachedGameRepository(
+    sp.GetRequiredService<GameRepository>(),
+    sp.GetRequiredService<IDistributedCache>(),
+    sp.GetRequiredService<ILogger<CachedGameRepository>>()));
 builder.Services.AddScoped<IUserGameRepository, UserGameRepository>();
 builder.Services.AddScoped<GameService>();
+builder.Services.AddScoped<ReviewService>();
+
+var mongoConnectionString = builder.Configuration["Mongo:ConnectionString"]
+    ?? throw new InvalidOperationException("A configuração Mongo:ConnectionString não foi encontrada.");
+var mongoDatabaseName = builder.Configuration["Mongo:DatabaseName"] ?? "fcg_catalog";
+
+builder.Services.AddSingleton<IMongoClient>(_ =>
+    new MongoClient(mongoConnectionString));
+builder.Services.AddScoped<IMongoDatabase>(sp =>
+    sp.GetRequiredService<IMongoClient>().GetDatabase(mongoDatabaseName));
+builder.Services.AddScoped<IReviewRepository, MongoReviewRepository>();
 
 builder.Services.AddHealthChecks();
 
@@ -116,6 +149,17 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider
         .GetRequiredService<CatalogDbContext>();
     db.Database.Migrate();
+
+    try
+    {
+        var repositorioAvaliacoes = scope.ServiceProvider.GetRequiredService<IReviewRepository>();
+        await repositorioAvaliacoes.InicializarAsync();
+    }
+    catch (Exception ex)
+    {
+        // Mongo fora do ar não pode impedir o catálogo (SQL) de subir: degrada como o cache.
+        app.Logger.LogError(ex, "Nao foi possivel inicializar a colecao de avaliacoes no MongoDB.");
+    }
 }
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
