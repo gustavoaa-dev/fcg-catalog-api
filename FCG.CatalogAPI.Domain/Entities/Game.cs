@@ -18,4 +18,19 @@ public class Game
         DataCadastro = DateTime.UtcNow;
         Usuarios = new List<UserGame>();
     }
+
+    /// <summary>
+    /// Reidrata um jogo já persistido, preservando o Id original. É usado pelo cache
+    /// (que guarda o objeto serializado); para criar um jogo novo continua valendo
+    /// apenas o construtor de três parâmetros, que gera um Id.
+    /// </summary>
+    public Game(Guid id, string nome, string descricao, decimal preco, DateTime dataCadastro)
+    {
+        Id = id;
+        Nome = nome;
+        Descricao = descricao;
+        Preco = preco;
+        DataCadastro = dataCadastro;
+        Usuarios = new List<UserGame>();
+    }
 }

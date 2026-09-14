@@ -1,12 +1,14 @@
 using FCG.CatalogAPI.Application.Consumers;
 using FCG.CatalogAPI.Application.Services;
 using FCG.CatalogAPI.Domain.Interfaces;
+using FCG.CatalogAPI.Infrastructure.Cache;
 using FCG.CatalogAPI.Infrastructure.Data;
 using FCG.CatalogAPI.Infrastructure.Repositories;
 using FCG.CatalogAPI.API.Middlewares;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using MongoDB.Driver;
@@ -100,7 +102,26 @@ builder.Services.AddMassTransit(x =>
     });
 });
 
-builder.Services.AddScoped<IGameRepository, GameRepository>();
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"] ?? "localhost:6379";
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    // abortConnect=false: sem Redis a API sobe e degrada em vez de falhar no boot.
+    // Timeouts curtos: um Redis morto falha rápido, não pendura a requisição.
+    options.ConfigurationOptions = new StackExchange.Redis.ConfigurationOptions
+    {
+        EndPoints = { redisConnectionString },
+        AbortOnConnectFail = false,
+        ConnectTimeout = 2000,
+        SyncTimeout = 2000
+    };
+});
+
+builder.Services.AddScoped<GameRepository>();
+builder.Services.AddScoped<IGameRepository>(sp => new CachedGameRepository(
+    sp.GetRequiredService<GameRepository>(),
+    sp.GetRequiredService<IDistributedCache>(),
+    sp.GetRequiredService<ILogger<CachedGameRepository>>()));
 builder.Services.AddScoped<IUserGameRepository, UserGameRepository>();
 builder.Services.AddScoped<GameService>();
 builder.Services.AddScoped<ReviewService>();
