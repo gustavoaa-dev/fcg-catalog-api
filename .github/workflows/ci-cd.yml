@@ -1,0 +1,50 @@
+name: ci-cd
+
+on:
+  push:
+    branches: [master, main]
+  workflow_dispatch:
+
+env:
+  SERVICO: fcg-catalog-api
+  DEPLOYMENT: catalog-api
+  ACR: fcgacr2026.azurecr.io
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore
+      - name: Build
+        run: dotnet build --no-restore -c Release
+      - name: Testes unitarios
+        run: dotnet test --no-build -c Release --logger "console;verbosity=normal"
+
+  image-deploy:
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Build e push da imagem no ACR
+        run: |
+          az acr login -n ${ACR%%.*}
+          docker build -t $ACR/$SERVICO:${{ github.sha }} .
+          docker push $ACR/$SERVICO:${{ github.sha }}
+      - uses: azure/setup-kubectl@v4
+        with:
+          version: v1.31.0
+      - name: Rolling update no AKS
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > kubeconfig
+          export KUBECONFIG=$PWD/kubeconfig
+          kubectl -n default set image deployment/$DEPLOYMENT \
+            $DEPLOYMENT=$ACR/$SERVICO:${{ github.sha }}
+          kubectl -n default rollout status deployment/$DEPLOYMENT --timeout=180s

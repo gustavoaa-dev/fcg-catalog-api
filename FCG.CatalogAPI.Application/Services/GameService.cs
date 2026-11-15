@@ -3,6 +3,7 @@ using FCG.CatalogAPI.Domain.Entities;
 using FCG.Shared.Events;
 using FCG.CatalogAPI.Domain.Interfaces;
 using MassTransit;
+using Microsoft.Extensions.Logging;
 
 namespace FCG.CatalogAPI.Application.Services;
 
@@ -11,15 +12,21 @@ public class GameService
     private readonly IGameRepository _gameRepository;
     private readonly IUserGameRepository _userGameRepository;
     private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IGameSearchIndex _search;
+    private readonly ILogger<GameService> _logger;
 
     public GameService(
         IGameRepository gameRepository,
         IUserGameRepository userGameRepository,
-        IPublishEndpoint publishEndpoint)
+        IPublishEndpoint publishEndpoint,
+        IGameSearchIndex search,
+        ILogger<GameService> logger)
     {
         _gameRepository = gameRepository;
         _userGameRepository = userGameRepository;
         _publishEndpoint = publishEndpoint;
+        _search = search;
+        _logger = logger;
     }
 
     public async Task<GameResponseDTO> CriarGame(CriarGameDTO dto)
@@ -31,6 +38,7 @@ public class GameService
 
         await _gameRepository.Adicionar(game);
         await _gameRepository.Salvar();
+        await IndexarSeguro(game);
 
         return MapearParaGameResponse(game);
     }
@@ -58,6 +66,38 @@ public class GameService
 
         await _gameRepository.Remover(game);
         await _gameRepository.Salvar();
+        await RemoverDoIndiceSeguro(id);
+    }
+
+    public async Task<GameResponseDTO> Atualizar(Guid id, CriarGameDTO dto)
+    {
+        var game = await _gameRepository.ObterPorId(id);
+        if (game is null)
+            throw new KeyNotFoundException("Jogo não encontrado.");
+
+        game.Alterar(dto.Nome, dto.Descricao, dto.Preco);
+
+        // O CachedGameRepository.Salvar() já invalida as chaves do Redis.
+        await _gameRepository.Salvar();
+        await IndexarSeguro(game);
+
+        return MapearParaGameResponse(game);
+    }
+
+    public async Task<IReadOnlyList<GameResponseDTO>> Buscar(string termo) =>
+        (await _search.BuscarAsync(termo)).Select(MapearParaGameResponse).ToList();
+
+    // O índice é reconstruível; o dado no SQL não. Falha de busca não derruba a escrita.
+    private async Task IndexarSeguro(Game game)
+    {
+        try { await _search.IndexarAsync(game); }
+        catch (Exception ex) { _logger.LogWarning(ex, "Falha ao indexar o jogo {GameId} no Elasticsearch.", game.Id); }
+    }
+
+    private async Task RemoverDoIndiceSeguro(Guid id)
+    {
+        try { await _search.RemoverAsync(id); }
+        catch (Exception ex) { _logger.LogWarning(ex, "Falha ao remover o jogo {GameId} do Elasticsearch.", id); }
     }
 
     public async Task<string> IniciarCompra(IniciarCompraDTO dto)

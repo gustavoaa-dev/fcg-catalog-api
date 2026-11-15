@@ -4,6 +4,7 @@ using FCG.CatalogAPI.Domain.Interfaces;
 using FCG.CatalogAPI.Infrastructure.Cache;
 using FCG.CatalogAPI.Infrastructure.Data;
 using FCG.CatalogAPI.Infrastructure.Repositories;
+using FCG.CatalogAPI.Infrastructure.Search;
 using FCG.CatalogAPI.API.Middlewares;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -126,6 +127,10 @@ builder.Services.AddScoped<IUserGameRepository, UserGameRepository>();
 builder.Services.AddScoped<GameService>();
 builder.Services.AddScoped<ReviewService>();
 
+var elasticUri = builder.Configuration["Elastic:Uri"] ?? "http://elasticsearch:9200";
+builder.Services.AddHttpClient<IGameSearchIndex, ElasticGameSearchIndex>(
+    c => c.BaseAddress = new Uri(elasticUri));
+
 var mongoConnectionString = builder.Configuration["Mongo:ConnectionString"]
     ?? throw new InvalidOperationException("A configuração Mongo:ConnectionString não foi encontrada.");
 var mongoDatabaseName = builder.Configuration["Mongo:DatabaseName"] ?? "fcg_catalog";
@@ -159,6 +164,19 @@ using (var scope = app.Services.CreateScope())
     {
         // Mongo fora do ar não pode impedir o catálogo (SQL) de subir: degrada como o cache.
         app.Logger.LogError(ex, "Nao foi possivel inicializar a colecao de avaliacoes no MongoDB.");
+    }
+
+    try
+    {
+        // Reindexar sempre custa menos que detectar índice vazio com dezenas de jogos.
+        var search = scope.ServiceProvider.GetRequiredService<IGameSearchIndex>();
+        var jogos = await scope.ServiceProvider.GetRequiredService<IGameRepository>().ObterTodos();
+        await search.ReindexarAsync(jogos);
+    }
+    catch (Exception ex)
+    {
+        // O índice é reconstruível; o catálogo não pode deixar de subir por causa dele.
+        app.Logger.LogError(ex, "Nao foi possivel popular o indice de busca no Elasticsearch.");
     }
 }
 

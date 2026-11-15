@@ -33,4 +33,11 @@ public class Game
         DataCadastro = dataCadastro;
         Usuarios = new List<UserGame>();
     }
+
+    public void Alterar(string nome, string descricao, decimal preco)
+    {
+        Nome = nome;
+        Descricao = descricao;
+        Preco = preco;
+    }
 }

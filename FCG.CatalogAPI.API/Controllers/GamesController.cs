@@ -103,4 +103,37 @@ public class GamesController : ControllerBase
             return BadRequest(new { mensagem = ex.Message });
         }
     }
+
+    [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Atualizar(Guid id, [FromBody] CriarGameDTO dto)
+    {
+        try
+        {
+            await _gameService.Atualizar(id, dto);
+            return NoContent();
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { mensagem = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { mensagem = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Busca textual no índice, com tolerância a erro de digitação e ordem por relevância.
+    /// Não consulta o SQL: é o Elasticsearch que responde.
+    /// </summary>
+    [HttpGet("search")]
+    [Authorize]
+    public async Task<ActionResult<IEnumerable<GameResponseDTO>>> Buscar([FromQuery] string q)
+    {
+        if (string.IsNullOrWhiteSpace(q))
+            return BadRequest(new { mensagem = "Informe o termo de busca." });
+
+        return Ok(await _gameService.Buscar(q));
+    }
 }
