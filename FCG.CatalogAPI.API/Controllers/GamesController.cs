@@ -90,7 +90,9 @@ public class GamesController : ControllerBase
     {
         try
         {
+            // O autor da compra é o usuário do token, nunca o do corpo.
             dto.GameId = id;
+            dto.UserId = ObterUsuarioId();
             var mensagem = await _gameService.IniciarCompra(dto);
             return Accepted(new { mensagem });
         }
@@ -135,5 +137,15 @@ public class GamesController : ControllerBase
             return BadRequest(new { mensagem = "Informe o termo de busca." });
 
         return Ok(await _gameService.Buscar(q));
+    }
+
+    /// <summary>O mesmo claim "Id" que a users-api assina e a biblioteca do monolito lê.</summary>
+    private Guid ObterUsuarioId()
+    {
+        var claimId = User.FindFirst("Id")?.Value;
+        if (claimId is null || !Guid.TryParse(claimId, out var userId))
+            throw new UnauthorizedAccessException("O token não contém um identificador de usuário válido.");
+
+        return userId;
     }
 }

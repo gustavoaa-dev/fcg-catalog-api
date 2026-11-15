@@ -20,6 +20,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FCG.CatalogAPI.API\FCG.CatalogAPI.API.csproj" />
     <ProjectReference Include="..\FCG.CatalogAPI.Application\FCG.CatalogAPI.Application.csproj" />
     <ProjectReference Include="..\FCG.CatalogAPI.Domain\FCG.CatalogAPI.Domain.csproj" />
     <ProjectReference Include="..\FCG.CatalogAPI.Infrastructure\FCG.CatalogAPI.Infrastructure.csproj" />

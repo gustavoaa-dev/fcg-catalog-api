@@ -1,4 +1,5 @@
 using System.Text.Json;
+using FCG.CatalogAPI.Application.Exceptions;
 
 namespace FCG.CatalogAPI.API.Middlewares;
 
@@ -28,6 +29,7 @@ public class ErrorHandlingMiddleware
                 ArgumentException => (StatusCodes.Status400BadRequest, ex.Message, ex.StackTrace),
                 UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, ex.Message, ex.StackTrace),
                 KeyNotFoundException => (StatusCodes.Status404NotFound, ex.Message, ex.StackTrace),
+                AcessoNegadoException => (StatusCodes.Status403Forbidden, ex.Message, ex.StackTrace),
                 _ => (StatusCodes.Status500InternalServerError, "Ocorreu um erro interno no servidor.", ex.StackTrace)
             };
 
