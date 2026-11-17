@@ -134,7 +134,7 @@ public class GamesController : ControllerBase
     public async Task<ActionResult<IEnumerable<GameResponseDTO>>> Buscar([FromQuery] string q)
     {
         if (string.IsNullOrWhiteSpace(q))
-            return BadRequest(new { mensagem = "Informe o termo de busca." });
+            return BadRequest(new { mensagem = "Informe o termo de busca(ex.: jogo)." });
 
         return Ok(await _gameService.Buscar(q));
     }
